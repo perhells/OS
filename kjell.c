@@ -16,10 +16,8 @@ int main()
     char delims[10] = " \n";
     getcwd(cwd, sizeof(cwd));
     printf("%s\n", cwd);
-    //fgets(line, sizeof(line), stdin);
     while(1)
     {
-        //printf("%s %d",line,strcmp(exit,line));
         fgets(line, sizeof(line), stdin);
         tok = strtok(line, delims);
 
@@ -41,16 +39,5 @@ int main()
             }
             printf("\n");
         }
-
-
-        //if(strcmp(tok,"exit")==0)
-        //{
-            //return exitKjell();
-        //}
-        //if(
-        //while(tok != NULL){
-            //printf("%s\n", tok);
-            //tok = strtok(NULL, delims);
-        //}
     }   
 }
