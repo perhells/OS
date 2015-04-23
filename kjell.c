@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#define BUFFERSIZE 100
 
 int exitKjell()
 {
@@ -9,21 +10,47 @@ int exitKjell()
 
 int main()
 {
-    char token[100];
     char *tok;
-    char line[100];
-    char exit[10] = "exit\n";
-    char cwd[100];
-    char tokenized[2][100];
+    char line[BUFFERSIZE];
+    char cwd[BUFFERSIZE];
+    char delims[10] = " \n";
     getcwd(cwd, sizeof(cwd));
     printf("%s\n", cwd);
-    fgets(line, sizeof(line), stdin);
-    while(strcmp("exit\n",line)!=0)
+    //fgets(line, sizeof(line), stdin);
+    while(1)
     {
-        printf("%s %d",line,strcmp(exit,line));
+        //printf("%s %d",line,strcmp(exit,line));
         fgets(line, sizeof(line), stdin);
-        tok = strtok(line, " ");
-        printf("%s\n", tok);
+        tok = strtok(line, delims);
+
+        if(strcmp(tok,"exit")==0)
+        {
+            return exitKjell(); 
+        }
+        else if(strcmp(tok,"pwd")==0)
+        {
+            getcwd(cwd, sizeof(cwd));
+            printf("%s\n", cwd);
+        }
+        else
+        {
+            while(tok != NULL)
+            {
+                printf("%s ", tok);
+                tok = strtok(NULL, delims);
+            }
+            printf("\n");
+        }
+
+
+        //if(strcmp(tok,"exit")==0)
+        //{
+            //return exitKjell();
+        //}
+        //if(
+        //while(tok != NULL){
+            //printf("%s\n", tok);
+            //tok = strtok(NULL, delims);
+        //}
     }   
-    return exitKjell();
 }
