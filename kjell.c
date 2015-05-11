@@ -3,6 +3,8 @@
 #include <unistd.h>
 #include <stdlib.h>
 #define BUFFERSIZE 100
+#define READ 0
+#define WRITE 1
 
 int exitKjell()
 {
@@ -46,7 +48,6 @@ int main(int argc, char* argv[], char* envp[])
             }
             else if(strcmp(tok,"checkEnv")==0)
             {
-                printf("0");
                 char *arguments = "";
                 //char *pager = "less";
 
@@ -63,14 +64,47 @@ int main(int argc, char* argv[], char* envp[])
 
                 while(tok=strtok(NULL,delims))
                 {
-                    printf("1");
                     //strcat(arguments,tok);   
                 } 
                 if(strcmp(arguments,"")==0)
                 {   
-                    printf("2");
-                    //system("printenv | sort | less");
-                    execlp("printenv", "printenv", NULL);
+                    pid_t pid;
+                    int status, pipa1[2], pipa2[2];
+                    char pager[10] = "less";
+                    if(-1 == pipe(pipa1));
+                    if(-1 == pipe(pipa2));
+                    if((pid = fork()) == 0) //printenv
+                    {
+                        dup2(pipa1[WRITE], WRITE);
+                        close(pipa1[READ]);
+                        close(pipa1[WRITE]);
+                        execlp("printenv", "printenv", NULL);
+                    }
+                    if((pid = fork()) == 0) //printenv
+                    {
+                        dup2(pipa1[READ], READ);
+                        close(pipa1[READ]);
+                        close(pipa1[WRITE]);
+                        dup2(pipa2[WRITE], WRITE);
+                        close(pipa2[READ]);
+                        close(pipa2[WRITE]);
+                        execlp("sort", "sort", NULL);
+                    }
+                    close(pipa1[READ]);
+                    close(pipa1[WRITE]);
+                    wait(&status);
+                    wait(&status);
+                    if((pid = fork()) == 0) //printenv
+                    {
+                        dup2(pipa2[READ], READ);
+                        close(pipa2[READ]);
+                        close(pipa2[WRITE]);
+                        execlp(pager, pager, NULL);
+                    }
+                    close(pipa2[READ]);
+                    close(pipa2[WRITE]);
+                    wait(&status);
+                    wait(&status);
                 }
                 else
                 {   
