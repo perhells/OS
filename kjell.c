@@ -13,31 +13,33 @@ int main()
     char *tok;
     char line[BUFFERSIZE];
     char cwd[BUFFERSIZE];
-    char delims[10] = " \n";
+    char delims[10] = " \t\n";
+    char prompt[10] = "> ";
     getcwd(cwd, sizeof(cwd));
     printf("%s\n", cwd);
     while(1)
-    {
+    {   
+        printf("%s",prompt);
         fgets(line, sizeof(line), stdin);
         tok = strtok(line, delims);
-
-        if(strcmp(tok,"exit")==0)
+        while(tok != NULL)
         {
-            return exitKjell(); 
-        }
-        else if(strcmp(tok,"pwd")==0)
-        {
-            getcwd(cwd, sizeof(cwd));
-            printf("%s\n", cwd);
-        }
-        else
-        {
-            while(tok != NULL)
+            if(strcmp(tok,"exit")==0)
+            {
+                return exitKjell(); 
+            }
+            else if(strcmp(tok,"pwd")==0)
+            {
+                getcwd(cwd, sizeof(cwd));
+                printf("%s\n", cwd);
+                tok = strtok(NULL, delims);
+            }
+            else
             {
                 printf("%s ", tok);
                 tok = strtok(NULL, delims);
             }
-            printf("\n");
         }
+        printf("\n");
     }   
 }
