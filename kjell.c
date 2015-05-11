@@ -49,38 +49,30 @@ int main(int argc, char* argv[], char* envp[])
             else if(strcmp(tok,"checkEnv")==0)
             {
                 char *arguments = "";
-                //char *pager = "less";
-
-                //char * new_str ;
-                //if((new_str = malloc(strlen(str1)+strlen(str2)+1)) != NULL){
-                    //new_str[0] = '\0';   // ensures the memory is an empty string
-                    //strcat(new_str,str1);
-                    //strcat(new_str,str2);
-                //} else {
-                    //fprintf(STDERR,"malloc failed!\n");
-                    // exit?
-                //}
-
-
-                while(tok=strtok(NULL,delims))
-                {
-                    //strcat(arguments,tok);   
-                } 
-                if(strcmp(arguments,"")==0)
+                printf("checkEnv: %s", arguments);
+                tok = strtok(NULL,delims);
+                printf("%s",arguments);
+                //if(tok != NULL)
+                //{
+                    //arguments = tok;
+                    //printf(".");
+                //} 
+                
+                if(tok == NULL)
                 {   
                     pid_t pid;
                     int status, pipa1[2], pipa2[2];
                     char pager[10] = "less";
                     if(-1 == pipe(pipa1));
                     if(-1 == pipe(pipa2));
-                    if((pid = fork()) == 0) //printenv
+                    if((pid = fork()) == 0) 
                     {
                         dup2(pipa1[WRITE], WRITE);
                         close(pipa1[READ]);
                         close(pipa1[WRITE]);
                         execlp("printenv", "printenv", NULL);
                     }
-                    if((pid = fork()) == 0) //printenv
+                    if((pid = fork()) == 0) 
                     {
                         dup2(pipa1[READ], READ);
                         close(pipa1[READ]);
@@ -94,7 +86,7 @@ int main(int argc, char* argv[], char* envp[])
                     close(pipa1[WRITE]);
                     wait(&status);
                     wait(&status);
-                    if((pid = fork()) == 0) //printenv
+                    if((pid = fork()) == 0) 
                     {
                         dup2(pipa2[READ], READ);
                         close(pipa2[READ]);
@@ -108,26 +100,73 @@ int main(int argc, char* argv[], char* envp[])
                 }
                 else
                 {   
-                    //char * derp;
-                    //strcat(derp, "printenv | grep ");
-                    //strcat(derp, arguments);
-                    //strcat(derp, " | sort | pager");
-                    //system(derp);
+                    printf("ja?");
+                    char grep[100] = "grep ";
+                    strcat(grep, tok);
+
+                    pid_t pid;
+                    int status, pipa1[2], pipa2[2], pipa3[2];
+                    char pager[10] = "less";
+                    if(-1 == pipe(pipa1));
+                    if(-1 == pipe(pipa2));
+                    if(-1 == pipe(pipa3));
+                    if((pid = fork()) == 0) 
+                    {
+                        printf("1");
+                        dup2(pipa1[WRITE], WRITE);
+                        close(pipa1[READ]);
+                        close(pipa1[WRITE]);
+                        execlp("printenv", "printenv", NULL);
+                    }
+                    if((pid = fork()) == 0) 
+                    {
+                        printf("2");
+                        dup2(pipa1[READ], READ);
+                        close(pipa1[READ]);
+                        close(pipa1[WRITE]);
+                        dup2(pipa2[WRITE], WRITE);
+                        close(pipa2[READ]);
+                        close(pipa2[WRITE]);
+                        execlp(grep, grep , NULL);
+                    }
+                    close(pipa1[READ]);
+                    close(pipa1[WRITE]);
+                    wait(&status);
+                    wait(&status);
+                    if((pid = fork()) == 0) 
+                    {
+                        printf("3");
+                        dup2(pipa2[READ], READ);
+                        close(pipa2[READ]);
+                        close(pipa2[WRITE]);
+                        dup2(pipa3[WRITE], WRITE);
+                        close(pipa3[READ]);
+                        close(pipa3[WRITE]);
+                        execlp("sort", "sort", NULL);
+                    }
+                    close(pipa2[READ]);
+                    close(pipa2[WRITE]);
+                    wait(&status);
+                    wait(&status);
+                    if((pid = fork()) == 0) 
+                    {
+                        printf("4");
+                        dup2(pipa3[READ], READ);
+                        close(pipa3[READ]);
+                        close(pipa3[WRITE]);
+                        execlp(pager, pager, NULL);
+                    }
+                    close(pipa3[READ]);
+                    close(pipa3[WRITE]);
+                    wait(&status);
+                    wait(&status);
                 }
-                //system("printenv | grep %s | less", );
-                //while(*envp)
-                //{
-                    //printf("%s\n",*envp);
-                    //envp++;
-                //}
                 tok = strtok(NULL, delims);
             }
             else
             {
-                //printf("%s", tok);
                 tok = strtok(NULL, delims);
             }
         }
-        //printf("\n");
     }   
 }
