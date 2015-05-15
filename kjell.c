@@ -1,3 +1,4 @@
+#define _POSIX_SOURCE
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -15,344 +16,363 @@
 #define SIGDET 1
 #endif
 
-FILE *fr;
-
+/* Function that kills all process in the current processgroup */
 int exitKjell()
 {
-    signal(SIGQUIT, SIG_IGN);
-    kill(0, SIGQUIT);
-    exit(0);
+    signal(SIGQUIT, SIG_IGN);   /* Ignore the quit signal for the shell */
+    kill(0, SIGQUIT);           /* Send the quit signal to all processes in group */
+    exit(0);                    /* Exits shell */
 }
 
+/* A signal handler for background processes */
 void sandler(int signum)
 {   
-    int pid = waitpid(-1,NULL,WNOHANG);
-    if(pid > 0)
+    int pid = waitpid(-1,NULL,WNOHANG); /* Returns the process id of a background process if it has terminated, else 0 or -1 */
+    if(pid > 0) /* Checks if a process has terminated */
     {
-        fprintf(stderr,"Process with pid %d has terminated\n",pid);
+        fprintf(stderr,"Process with pid %d has terminated\n",pid); /* Prints a message */
     }
 }
 
+/* A handler for ctrl-C interrupts */
 void intHandler(int signum)
 {
-    kill(signum, SIGCHLD);
-    while(waitpid(-1,NULL,WNOHANG)>0){}
+    kill(signum, SIGCHLD); /* Kill the process in which the command was issued */
+    while(waitpid(-1,NULL,WNOHANG)>0){} /* Kill the process */
 }
 
+/* Main function */
 int main(int argc, char* argv[], char* envp[])
 {
-    struct sigaction sa;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
+    FILE *fr;                                   /* Used for reading the hostname */
+    char *tok;                                  /* Holds current token when parsing a line */
+    char line[BUFFERSIZE];                      /* Line from input */
+    char cwd[BUFFERSIZE];                       /* Current working directory */
+    char delims[10] = " \t\n";                  /* Delimiters for tokens */
+    char prompt[10] = "> ";                     /* Prompt after user/host/cwd info */
+    char pager[BUFFERSIZE] = "less";            /* Which pager to use, less is default */
+    char hostname[BUFFERSIZE];                  /* Machines hostname */
+    char username[BUFFERSIZE];                  /* Username */
+    int status, pipa1[2], pipa2[2], pipa3[2];   /* Status for wait, all three pipes used in checkEnv */
+    int foreground;                             /* Keeps track of whether a process should be executed in foreground */
+    char ** res;                                /* Argument list */
+    char * p;                                   /* Used when tokenizing arguments */
+    int n_spaces = 0;                           /* Counting arguments */
+    pid_t pid;                                  /* Process ID */
+    struct timeval tvalBefore, tvalAfter;       /* Used to measure time of processes */
 
-    char *tok;
-    char line[BUFFERSIZE];
-    char cwd[BUFFERSIZE];
-    char delims[10] = " \t\n";
-    char prompt[10] = "> ";
-    char pager[BUFFERSIZE] = "less";
-    char hostname[BUFFERSIZE];
-    char username[BUFFERSIZE];
-    char arguments[BUFFERSIZE];
-    int status, pipa1[2], pipa2[2], pipa3[2];
-    int foreground;
-    char ** res;
-    char * p;
-    int n_spaces = 0;
-    pid_t pid;
-    struct timeval tvalBefore, tvalAfter;
-    strcpy(username,getenv("USER"));
-    if(getenv("PAGER")!=NULL)
+    strcpy(username,getenv("USER"));            /* Reads environment variable USER to username */
+    if(getenv("PAGER")!=NULL)                   /* If environment variable PAGER exists */
     {
-        strcpy(pager,getenv("PAGER"));
+        strcpy(pager,getenv("PAGER"));          /* Overwrite less with current PAGER */
     }
-    fr = fopen ("/etc/hostname", "rt");
-    fgets(hostname, BUFFERSIZE, fr);
-    strcpy(hostname,strtok(hostname,"\n"));
-    fclose(fr);
-    getcwd(cwd, sizeof(cwd));
-    while(1)
+    fr = fopen ("/etc/hostname", "rt");         /* Open file that contains hostname */
+    fgets(hostname, BUFFERSIZE, fr);            /* Reads hostname */
+    strcpy(hostname,strtok(hostname,"\n"));     /* Remove trailing newline */
+    fclose(fr);                                 /* Close file */
+    getcwd(cwd, sizeof(cwd));                   /* Read current working directory */
+    /* Main loop */
+    while(1)    
     {   
-        if(!SIGDET)
+        if(!SIGDET)     /* Checks if polling of background processes should be used */
         {
-            pid = waitpid(-1, &status, WNOHANG);
-            if(pid > 0)
+            pid = waitpid(-1, &status, WNOHANG);    /* Checks if any background process has terminated */
+            while(pid > 0)                          /* While something has terminated */
             {
-                printf("Process with pid %d has terminated.\n", pid);
+                printf("Process with pid %d has terminated.\n", pid);   /* Print it's process ID */
+                pid = waitpid(-1, &status, WNOHANG);                    /* Check if there is another procees which has terminated */
             }
         }
-        printf("[%s@%s %s] %s", username, hostname, cwd, prompt);
-        fgets(line, sizeof(line), stdin);
-        tok = strtok(line, delims);
-        while(tok != NULL)
-        {
-            if(strcmp(tok,"exit")==0)
+        printf("[%s@%s %s] %s", username, hostname, cwd, prompt);   /* Print full prompt */
+        fgets(line, sizeof(line), stdin);   /* Read input */
+        tok = strtok(line, delims);         /* Get first token */
+        while(tok != NULL)                  /* If there is a token */
+        {   
+            if(strcmp(tok,"exit")==0)       /* If token is exit */
             {
-                return exitKjell(); 
+                return exitKjell();         /* Call exit function */
             }
-            else if(strcmp(tok,"pwd")==0)
+            else if(strcmp(tok,"pwd")==0)   /* If token is pwd */
             {
-                getcwd(cwd, sizeof(cwd));
-                printf("%s\n", cwd);
-                tok = strtok(NULL, delims);
-            }
-            else if(strcmp(tok,"cd")==0)
-            {
-                tok = strtok(NULL, delims);
-                if(chdir(tok)==0 && strtok(NULL,delims) == NULL)
+                tok = strtok(NULL, delims);     /* Check next token */
+                if(strtok(NULL,delims) == NULL) /* Check that it is NULL */
                 {
-                    getcwd(cwd, sizeof(cwd));
+                    getcwd(cwd, sizeof(cwd));   /* Read current working directory */
+                    printf("%s\n", cwd);        /* Print it */
                 }
-                else
+                else    /* pwd doesn't take any arguments */
+                {
+                    printf("Too many arguments!\n");
+                    break;
+                }
+            }
+            else if(strcmp(tok,"cd")==0)    /* If token is cd */
+            {
+                tok = strtok(NULL, delims); /* Read next token */
+                if(strtok(NULL,delims) == NULL && chdir(tok)==0)    /* Check that next token is NULL, and directory change to token is okay */
+                {
+                    getcwd(cwd, sizeof(cwd));   /* Update current working directory */
+                }
+                else    /* Too many arguments, or invalid directory */
                 {
                     printf("Failed to change directory!\n");
                     break;
                 }
             }
-            else if(strcmp(tok,"checkEnv")==0)
+            else if(strcmp(tok,"checkEnv")==0)  /* If token is checkEnv */
             {   
-                tok = strtok(NULL, delims);
-                if(tok == NULL)
+                tok = strtok(NULL, delims);     /* Read next token */
+                if(tok == NULL)                 /* Check if any arguments is given */
                 {   
-                    if(-1 == pipe(pipa1));
-                    if(-1 == pipe(pipa2));
-                    if((pid = fork()) == 0) 
+                    if(-1 == pipe(pipa1));          /* Create first pipe */
+                    if(-1 == pipe(pipa2));          /* Create second pipe */
+                    if((pid = fork()) == 0)         /* Fork and execute in child process */
                     {
-                        dup2(pipa1[WRITE], WRITE);
+                        dup2(pipa1[WRITE], WRITE);  /* stdout writes to first pipe */
+                        close(pipa1[READ]);         
+                        close(pipa1[WRITE]);
+                        if(execlp("printenv", "printenv", NULL)==-1)fprintf(stderr,"\"printenv\" failed\n");    /* Try to execute printenv */
+                    }
+                    else if(pid == -1)              /* If fork returns -1 it failed */
+                    {
+                        fprintf(stderr,"Fork failed");
+                    }
+                    if((pid = fork()) == 0)         /* Fork and execute in child process */
+                    {
+                        dup2(pipa1[READ], READ);    /* stdin reads from first pipe */
                         close(pipa1[READ]);
                         close(pipa1[WRITE]);
-                        execlp("printenv", "printenv", NULL);
-                    }
-                    if((pid = fork()) == 0) 
-                    {
-                        dup2(pipa1[READ], READ);
-                        close(pipa1[READ]);
-                        close(pipa1[WRITE]);
-                        dup2(pipa2[WRITE], WRITE);
+                        dup2(pipa2[WRITE], WRITE);  /* stdout writes to second pipe */
                         close(pipa2[READ]);
                         close(pipa2[WRITE]);
-                        execlp("sort", "sort",  NULL);
+                        if(execlp("sort", "sort",  NULL)==-1)fprintf(stderr,"\"sort\" failed\n");   /* Try to execute sort */
                     }
-                    close(pipa1[READ]);
-                    close(pipa1[WRITE]);
-                    wait(&status);
-                    wait(&status);
-                    if((pid = fork()) == 0) 
+                    else if(pid == -1)              /* If fork returns -1 it failed */
                     {
-                        dup2(pipa2[READ], READ);
-                        close(pipa2[READ]);
+                        fprintf(stderr,"Fork failed");
+                    }
+                    close(pipa1[READ]);     /* Done using first pipe */
+                    close(pipa1[WRITE]);    /* Done using first pipe */
+                    if((pid = fork()) == 0)         /* Fork and execute in child process */
+                    {
+                        dup2(pipa2[READ], READ);    /* stdin reads from second pipe */
+                        close(pipa2[READ]);         
                         close(pipa2[WRITE]);
-                        if(execlp(pager, pager, NULL) == -1)
+                        if(execlp(pager, pager, NULL) == -1)        /* If pager cannot be executed */
                         {
-                            if(execlp("less","less",NULL) == -1)
+                            if(execlp("less","less",NULL) == -1)    /* Try less */
                             {
-                                execlp("more","more",NULL);
+                                if(execlp("more","more",NULL)==-1)fprintf(stderr,"No pager found, \"less\" and \"more\" failed");   /* Finally try more */
                             }
                         }
                     }
+                    else if(pid == -1)              /* If fork returns -1 it failed */
+                    {
+                        fprintf(stderr,"Fork failed");
+                    }
                     close(pipa2[READ]);
                     close(pipa2[WRITE]);
-                    wait(&status);
-                    wait(&status);
+                    wait(&status);                  /* Wait for first process */
+                    wait(&status);                  /* Wait for second process */
+                    wait(&status);                  /* Wait for third process */
                 }
                 else
                 {   
-                    res  = NULL;
-                    p = tok;
-                    n_spaces = 0;
+                    res  = NULL;    /* Make sure there are no old arguments */
+                    p = tok;        /* First argument */
+                    n_spaces = 0;   /* Reset argument count */
                     
-                    res = realloc (res, sizeof (char*) * ++n_spaces);
-                    if (res == NULL)
+                    res = realloc (res, sizeof (char*) * ++n_spaces); /* Allocate memory for first argument */
+                    if (res == NULL)    /* If res still is NULL, memory allocation failed */
                     {
-                        printf("FEL");
+                        fprintf(stderr, "Error while allocating memory");
                     }
-                    res[n_spaces-1] = "grep";
+                    res[n_spaces-1] = "grep"; /* First argument should be grep */
                     
-                    while (p) {
-                        res = realloc (res, sizeof (char*) * ++n_spaces);
+                    while (p) { /* While there is an argument */
+                        res = realloc (res, sizeof (char*) * ++n_spaces);   /* Allocate memory for it */
 
-                        if (res == NULL)
+                        if (res == NULL)    /* If res is NULL, memory allocation failed */
                         {
-                            printf("FEL");
+                            fprintf(stderr, "Error while allocating memory");
                         }
                         
-                        res[n_spaces-1] = p;
+                        res[n_spaces-1] = p;        /* Add current argument to list of arguments */
                         
-                        p = strtok (NULL, delims);
+                        p = strtok (NULL, delims);  /* Read next argument */
                     }
                     
-                    /* realloc one extra element for the last NULL */
+                    /* Allocate one extra element for the last NULL */
                     
-                    res = realloc (res, sizeof (char*) * (n_spaces+1));
-                    res[n_spaces] = NULL;
+                    res = realloc (res, sizeof (char*) * (n_spaces+1)); /* Allocate space for the last element */
+                    res[n_spaces] = NULL;   /* Arguments should be NULL terminated */
 
-                    strcpy(arguments,tok);
-                    tok = strtok(NULL,delims);
-                    while (tok != NULL)
+                    if(-1 == pipe(pipa1));  /* Create first pipe */
+                    if(-1 == pipe(pipa2));  /* Create second pipe */
+                    if(-1 == pipe(pipa3));  /* Create third pipe */
+                    if((pid = fork()) == 0) /* Fork and execute in child process */
                     {
-                        strcat(arguments, " ");
-                        strcat(arguments, tok);
-                        tok = strtok(NULL,delims);
-                    }
-
-                    if(-1 == pipe(pipa1));
-                    if(-1 == pipe(pipa2));
-                    if(-1 == pipe(pipa3));
-                    if((pid = fork()) == 0) 
-                    {
-                        dup2(pipa1[WRITE], WRITE);
+                        dup2(pipa1[WRITE], WRITE);  /* stdout writes to first pipe */
                         close(pipa1[READ]);
                         close(pipa1[WRITE]);
-                        execlp("printenv", "printenv", NULL);
+                        if(execlp("printenv", "printenv", NULL)==-1)fprintf(stderr,"\"printenv\" failed\n");    /* Try to execute printenv */
                     }
-                    if((pid = fork()) == 0) 
+                    else if(pid == -1)  /* If fork returns -1 it has failed */
                     {
-                        dup2(pipa1[READ], READ);
+                        fprintf(stderr,"Fork failed");
+                    }
+                    if((pid = fork()) == 0) /* Fork and execute in child process */
+                    {
+                        dup2(pipa1[READ], READ);    /* stdin reads from first pipe */
                         close(pipa1[READ]);
                         close(pipa1[WRITE]);
-                        dup2(pipa2[WRITE], WRITE);
+                        dup2(pipa2[WRITE], WRITE);  /* stdout writes to second pipe */
                         close(pipa2[READ]);
                         close(pipa2[WRITE]);
-                        execvp(res[0], res);
+                        if(execvp(res[0], res)==-1)fprintf(stderr,"\"grep\" failed\n"); /* Try to execute grep with all arguments */
+                    }
+                    else if(pid == -1)  /* If fork returns -1 it has failed */
+                    {
+                        fprintf(stderr,"Fork failed");
                     }
                     close(pipa1[READ]);
                     close(pipa1[WRITE]);
-                    wait(&status);
-                    wait(&status);
-                    if((pid = fork()) == 0) 
+                    if((pid = fork()) == 0) /* Fork and execute in child process */
                     {
-                        dup2(pipa2[READ], READ);
+                        dup2(pipa2[READ], READ);    /* stdin reads from second pipe */
                         close(pipa2[READ]);
                         close(pipa2[WRITE]);
-                        dup2(pipa3[WRITE], WRITE);
+                        dup2(pipa3[WRITE], WRITE);  /* stdout writes to third pipe */
                         close(pipa3[READ]);
                         close(pipa3[WRITE]);
-                        execlp("sort", "sort", NULL);
+                        if(execlp("sort", "sort",  NULL)==-1)fprintf(stderr,"\"sort\" failed\n");   /* Try to execute sort */
+                    }
+                    else if(pid == -1)  /* If fork returns -1 is has failed */
+                    {
+                        fprintf(stderr,"Fork failed");
                     }
                     close(pipa2[READ]);
                     close(pipa2[WRITE]);
-                    wait(&status);
-                    wait(&status);
-                    if((pid = fork()) == 0) 
+                    if((pid = fork()) == 0) /* Fork and execute in child process */
                     {
-                        dup2(pipa3[READ], READ);
+                        dup2(pipa3[READ], READ);    /* stdin reads from third pipe */
                         close(pipa3[READ]);
                         close(pipa3[WRITE]);
-                        if(execlp(pager, pager, NULL) == -1)
+                        if(execlp(pager, pager, NULL) == -1)        /* If pager cannot be executed */
                         {
-                            if(execlp("less","less",NULL) == -1)
+                            if(execlp("less","less",NULL) == -1)    /* Try less */
                             {
-                                execlp("more","more",NULL);
+                                if(execlp("more","more",NULL)==-1)fprintf(stderr,"No pager found, \"less\" and \"more\" failed");   /* Finally try more */
                             }
                         }
                     }
+                    else if(pid == -1)  /* If fork returns -1 it has failed */
+                    {
+                        fprintf(stderr,"Fork failed");
+                    }
                     close(pipa3[READ]);
-                    close(pipa3[WRITE]);
-                    wait(&status);
-                    wait(&status);
-                    
-                    /* free the memory allocated */
+                    close(pipa3[WRITE]);                    
+                    wait(&status);  /* Wait for the first process */
+                    wait(&status);  /* Wait for the second process */
+                    wait(&status);  /* Wait for the third process */
+                    wait(&status);  /* Wait for the fourth process */
+
+                    /* Free the memory allocated for arguments */
                     
                     free (res);
                 }
-                tok = strtok(NULL, delims);
+                tok = strtok(NULL, delims); /* Make sure there are no arguments still in tok */
             }
             else
             {   
-                res = NULL;
-                p = tok;
-                n_spaces = 0; 
-                foreground = 1;
+                res = NULL;     /* Reset argument list */
+                p = tok;        /* Read first argument */
+                n_spaces = 0;   /* Reset argument count */
+                foreground = 1; /* Process should run in foreground by default */
                 
-                while (p) {
-                    if(strcmp(p,"&")==0)
+                while (p) {     /* While there is at least one more argument */
+                    tok = strtok(NULL,delims);  /* Read next token */
+                    if(strcmp(p,"&")==0 && tok == NULL) /* If the argument is & and it is the last argument*/
                     {
-                        p = strtok(NULL,delims);
-                        foreground = 0;
+                        foreground = 0;             /* The process should execute in the background */
+                        p = NULL;                   /* Loop is finished */
                     }
                     else
                     {
-                        res = realloc (res, sizeof (char*) * ++n_spaces);
-                        if (res == NULL)
+                        res = realloc (res, sizeof (char*) * ++n_spaces); /* Allocate space for one more token */
+                        if (res == NULL)    /* If res is NULL allocation has failed */
                         {
-                            printf("FEL");
+                            fprintf(stderr, "Error while allocating memory");
                         }
                         
-                        res[n_spaces-1] = p;
+                        res[n_spaces-1] = p;    /* Set element to token */
                         
-                        p = strtok (NULL, delims);
+                        p = tok;                /* Set token to next token */
                     }
                 }
                 
-                /* realloc one extra element for the last NULL */
+                /* Allocate memory for one extra element for the last NULL */
                 
                 res = realloc (res, sizeof (char*) * (n_spaces+1));
                 res[n_spaces] = NULL;
-                if(foreground)
+                if(foreground)  /*If the process should be run in the foreground */
                 {
-                    gettimeofday (&tvalBefore, NULL);
+                    gettimeofday (&tvalBefore, NULL);   /* Save the starting time */
                 }
-                if(SIGDET)
+                if(SIGDET)  /* If signal handler should be used instead of polling */
                 {   
-                    memset(&sa, 0, sizeof(sa));
-                    sa.sa_handler = sandler;
-                    //if(sigaction(SIGCHLD,&sa,0))
-                    //{
-                        //perror("sigaction");
-                        //return 1;
-                    //}
-                    if(!foreground)signal(SIGCHLD,sandler);
-                    signal(SIGINT,intHandler);
-                    pid = fork();
-                    if(pid == -1)
+                    if(!foreground)signal(SIGCHLD,sandler); /* Register signalr handler for SIGCHLD */
+                    signal(SIGINT,intHandler);  /* Register interrupt handler for sigchld */
+                    pid = fork();   /* Try to fork */
+                    if(pid == -1)   /* If fork returns -1 it has failed */
+                    {
+                        perror("Fork failed");
+                    }
+                    else if(pid == 0) /* Execute in child process */
+                    {   
+                        int exitStatus = 0; /* Default exit status is 0 */
+                        if(execvp(res[0],res)==-1)  /* If execution fails */
+                        {
+                            exitStatus = 1; /* Set exit status to 1 */
+                        }
+                        exit(exitStatus);   /* Return exit status */
+                    }
+                    else if(foreground) /* If the process should be executed in foreground */
+                    {   
+                        waitpid(pid,&status,0); /* Wait for it to finish */
+                    }
+                }
+                else    /* If polling should be used */
+                {
+                    signal(SIGINT,intHandler);  /* Register interrupt handler for sigchld */
+                    pid = fork();   /* Try to fork */
+                    if(pid == -1)   /* If fork returns -1 it has failed */
                     {
                         perror("Fork failed");
                         exit(1);
                     }
-                    else if(pid == 0)
+                    else if(pid == 0)   /* Execute in child process */
                     {   
-                        int exitStatus = 0;
-                        if(execvp(res[0],res)==-1)
+                        int exitStatus = 0; /* Default exit status is 0 */
+                        if(execvp(res[0],res)==-1)  /* If execution fails */
                         {
-                            exitStatus = 1;
+                            exitStatus = 1; /* Set exit status to 1 */
                         }
-                        exit(exitStatus);
+                        exit(exitStatus);   /* Return exit status */
                     }
-                    else if(foreground)
+                    else if(foreground) /* If the process should be executed in foreground */
                     {   
-                        waitpid(pid,&status,0);
+                        waitpid(pid,&status,0); /* Wait for it to finish */
                     }
                 }
-                else
+                if(foreground)  /* If the process was executed in foreground */
                 {
-                    pid = fork();
-                    if(pid == -1)
-                    {
-                        perror("Fork failed");
-                        exit(1);
-                    }
-                    else if(pid == 0)
-                    {   
-                        int exitStatus = 0;
-                        if(execvp(res[0],res)==-1)
-                        {
-                            exitStatus = 1;
-                        }
-                        exit(exitStatus);
-                    }
-                    else if(foreground)
-                    {   
-                        waitpid(pid,&status,0);
-                    }
+                    gettimeofday (&tvalAfter, NULL);    /* Get the stop time */
+                    printf("Time in microseconds: %ld microseconds\n",((tvalAfter.tv_sec - tvalBefore.tv_sec)*1000000L+tvalAfter.tv_usec) - tvalBefore.tv_usec);    /* Print the execution time */
                 }
-                if(foreground)
-                {
-                    gettimeofday (&tvalAfter, NULL);
-                    printf("Time in microseconds: %ld microseconds\n",((tvalAfter.tv_sec - tvalBefore.tv_sec)*1000000L+tvalAfter.tv_usec) - tvalBefore.tv_usec);
-                }
-                free(res);
-                foreground = 0;
-                tok = strtok(NULL, delims);
+                free(res);                  /* Free the memory used */
+                foreground = 0;             /* Reset foreground variable */
+                tok = strtok(NULL, delims); /* Reset tok */
             }
         }
     }   
