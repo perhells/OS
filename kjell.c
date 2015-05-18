@@ -49,6 +49,7 @@ void intKjell(int signum)
 /* Main function */
 int main(int argc, char* argv[], char* envp[])
 {
+    struct sigaction sa;
     FILE *fr;                                   /* Used for reading the hostname */
     char *tok;                                  /* Holds current token when parsing a line */
     char line[BUFFERSIZE];                      /* Line from input */
@@ -66,6 +67,7 @@ int main(int argc, char* argv[], char* envp[])
     pid_t pid;                                  /* Process ID */
     struct timeval tvalBefore, tvalAfter;       /* Used to measure time of processes */
 
+    sigemptyset(&sa.sa_mask);
     strcpy(username,getenv("USER"));            /* Reads environment variable USER to username */
     if(getenv("PAGER")!=NULL)                   /* If environment variable PAGER exists */
     {
@@ -340,7 +342,9 @@ int main(int argc, char* argv[], char* envp[])
                 }
                 if(SIGDET)  /* If signal handler should be used instead of polling */
                 {   
-                    if(!foreground)signal(SIGCHLD,sandler);     /* Register signal handler for SIGCHLD */
+                    sa.sa_flags = 0;
+                    sa.sa_handler = sandler;
+                    if(sigaction(SIGCHLD,&sa,NULL)==-1)fprintf(stderr,"sigaction failed\n");  /* Register signal handler for SIGCHLD */
                     if(foreground)signal(SIGINT,intHandler);    /* Register interrupt handler */
                     pid = fork();   /* Try to fork */
                     if(pid == -1)   /* If fork returns -1 it has failed */
