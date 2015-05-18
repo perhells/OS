@@ -236,7 +236,7 @@ int main(int argc, char* argv[], char* envp[])
                         dup2(pipa1[WRITE], WRITE);  /* stdout writes to first pipe */
                         close(pipa1[READ]);
                         close(pipa1[WRITE]);
-                        if(execlp("printenv", "printenv", NULL)==-1)fprintf(stderr,"\"printenv\" failed\n");    /* Try to execute printenv */
+                        if(execlp("printenv", "printenv",NULL)==-1)fprintf(stderr,"\"printenv\" failed\n");    /* Try to execute printenv */
                     }
                     else if(pid == -1)  /* If fork returns -1 it has failed */
                     {
@@ -359,7 +359,6 @@ int main(int argc, char* argv[], char* envp[])
                     }
                     else if(foreground)     /* If the process should be executed in foreground */
                     {
-                        signal(SIGCHLD, SIG_IGN);   
                         waitpid(pid,&status,0); /* Wait for it to finish */
                     }
                 }
