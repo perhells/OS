@@ -132,7 +132,7 @@ int main(int argc, char* argv[], char* envp[])
                 if((tok == NULL || strcmp(tok,"~")==0) && getenv("HOME")!=NULL)
                 {
                     printf("%s\n",getenv("HOME"));
-                    tok = getenv("HOME");          /* Overwrite less with current PAGER */
+                    tok = getenv("HOME");          /* Overwrite token with HOME */
                 }
                 if(strtok(NULL,delims) == NULL && chdir(tok)==0)    /* Check that next token is NULL, and directory change to token is okay */
                 {
@@ -373,7 +373,7 @@ int main(int argc, char* argv[], char* envp[])
                 }
                 else    /* If polling should be used */
                 {
-                    if(foreground)signal(SIGINT,intHandler);    /* Register interrupt handler for sigchld */
+                    if(foreground)signal(SIGINT,intHandler);    /* Register interrupt handler */
                     pid = fork();   /* Try to fork */
                     if(pid == -1)   /* If fork returns -1 it has failed */
                     {
