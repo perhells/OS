@@ -51,7 +51,7 @@ int main(int argc, char* argv[], char* envp[])
 {
     struct sigaction sa;
     FILE *fr;                                   /* Used for reading the hostname */
-    char *tok;                                  /* Holds current token when parsing a line */
+    char *tok;                                   /* Holds current token when parsing a line */
     char line[BUFFERSIZE];                      /* Line from input */
     char cwd[BUFFERSIZE];                       /* Current working directory */
     char delims[10] = " \t\n";                  /* Delimiters for tokens */
@@ -129,6 +129,11 @@ int main(int argc, char* argv[], char* envp[])
             else if(strcmp(tok,"cd")==0)    /* If token is cd */
             {
                 tok = strtok(NULL, delims); /* Read next token */
+                if((tok == NULL || strcmp(tok,"~")==0) && getenv("HOME")!=NULL)
+                {
+                    printf("%s\n",getenv("HOME"));
+                    tok = getenv("HOME");          /* Overwrite less with current PAGER */
+                }
                 if(strtok(NULL,delims) == NULL && chdir(tok)==0)    /* Check that next token is NULL, and directory change to token is okay */
                 {
                     if(getcwd(cwd, sizeof(cwd))==NULL)   /* Update current working directory */
