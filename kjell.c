@@ -41,6 +41,11 @@ void intHandler(int signum)
     while(waitpid(-1,NULL,WNOHANG)>0){} /* Kill the process */
 }
 
+void intKjell(int signum)
+{
+    fseek(stdin,0,SEEK_END);
+}
+
 /* Main function */
 int main(int argc, char* argv[], char* envp[])
 {
@@ -67,13 +72,23 @@ int main(int argc, char* argv[], char* envp[])
         strcpy(pager,getenv("PAGER"));          /* Overwrite less with current PAGER */
     }
     fr = fopen ("/etc/hostname", "rt");         /* Open file that contains hostname */
-    fgets(hostname, BUFFERSIZE, fr);            /* Reads hostname */
+    if(fgets(hostname, BUFFERSIZE, fr)==NULL)   /* Reads hostname */
+    {
+        fprintf(stderr,"fgets failed\n");
+    }
     strcpy(hostname,strtok(hostname,"\n"));     /* Remove trailing newline */
     fclose(fr);                                 /* Close file */
-    getcwd(cwd, sizeof(cwd));                   /* Read current working directory */
+    if(getcwd(cwd, sizeof(cwd))==NULL)                   /* Read current working directory */
+    {
+        fprintf(stderr,"getcwd failed\n");
+    }
+
     /* Main loop */
     while(1)    
     {   
+        signal(SIGINT,intKjell);    /* Register interrupt handler for ctrl-C */
+        tok = NULL;                 /* Reset token */
+        strcpy(line,"");            /* Reset input line */
         if(!SIGDET)     /* Checks if polling of background processes should be used */
         {
             pid = waitpid(-1, &status, WNOHANG);    /* Checks if any background process has terminated */
@@ -84,7 +99,7 @@ int main(int argc, char* argv[], char* envp[])
             }
         }
         printf("[%s@%s %s] %s", username, hostname, cwd, prompt);   /* Print full prompt */
-        fgets(line, sizeof(line), stdin);   /* Read input */
+        if(fgets(line, sizeof(line), stdin)==NULL);   /* Read input */
         tok = strtok(line, delims);         /* Get first token */
         while(tok != NULL)                  /* If there is a token */
         {   
@@ -97,7 +112,10 @@ int main(int argc, char* argv[], char* envp[])
                 tok = strtok(NULL, delims);     /* Check next token */
                 if(strtok(NULL,delims) == NULL) /* Check that it is NULL */
                 {
-                    getcwd(cwd, sizeof(cwd));   /* Read current working directory */
+                    if(getcwd(cwd, sizeof(cwd))==NULL)   /* Read current working directory */
+                    {
+                        fprintf(stderr,"getcwd failed\n");
+                    }
                     printf("%s\n", cwd);        /* Print it */
                 }
                 else    /* pwd doesn't take any arguments */
@@ -111,7 +129,10 @@ int main(int argc, char* argv[], char* envp[])
                 tok = strtok(NULL, delims); /* Read next token */
                 if(strtok(NULL,delims) == NULL && chdir(tok)==0)    /* Check that next token is NULL, and directory change to token is okay */
                 {
-                    getcwd(cwd, sizeof(cwd));   /* Update current working directory */
+                    if(getcwd(cwd, sizeof(cwd))==NULL)   /* Update current working directory */
+                    {
+                        fprintf(stderr,"getcwd failed\n");
+                    }
                 }
                 else    /* Too many arguments, or invalid directory */
                 {
@@ -281,7 +302,7 @@ int main(int argc, char* argv[], char* envp[])
                     
                     free (res);
                 }
-                tok = strtok(NULL, delims); /* Make sure there are no arguments still in tok */
+                tok = NULL; /* Make sure there are no arguments still in tok */
             }
             else
             {   
@@ -297,38 +318,37 @@ int main(int argc, char* argv[], char* envp[])
                         foreground = 0;             /* The process should execute in the background */
                         p = NULL;                   /* Loop is finished */
                     }
-                    else
+
+                    res = realloc (res, sizeof (char*) * ++n_spaces); /* Allocate space for one more token */
+                    if (res == NULL)    /* If res is NULL allocation has failed */
                     {
-                        res = realloc (res, sizeof (char*) * ++n_spaces); /* Allocate space for one more token */
-                        if (res == NULL)    /* If res is NULL allocation has failed */
-                        {
-                            fprintf(stderr, "Error while allocating memory");
-                        }
-                        
-                        res[n_spaces-1] = p;    /* Set element to token */
-                        
-                        p = tok;                /* Set token to next token */
+                        fprintf(stderr, "Error while allocating memory");
                     }
+                    
+                    res[n_spaces-1] = p;    /* Set element to token */
+                        
+                    p = tok;                /* Set token to next token */
                 }
                 
                 /* Allocate memory for one extra element for the last NULL */
-                
                 res = realloc (res, sizeof (char*) * (n_spaces+1));
                 res[n_spaces] = NULL;
+
                 if(foreground)  /*If the process should be run in the foreground */
                 {
                     gettimeofday (&tvalBefore, NULL);   /* Save the starting time */
                 }
                 if(SIGDET)  /* If signal handler should be used instead of polling */
                 {   
-                    if(!foreground)signal(SIGCHLD,sandler); /* Register signalr handler for SIGCHLD */
-                    signal(SIGINT,intHandler);  /* Register interrupt handler for sigchld */
+                    if(!foreground)signal(SIGCHLD,sandler);     /* Register signal handler for SIGCHLD */
+                    if(foreground)signal(SIGINT,intHandler);    /* Register interrupt handler */
                     pid = fork();   /* Try to fork */
                     if(pid == -1)   /* If fork returns -1 it has failed */
                     {
                         perror("Fork failed");
+                        exit(1);
                     }
-                    else if(pid == 0) /* Execute in child process */
+                    else if(pid == 0)       /* Execute in child process */
                     {   
                         int exitStatus = 0; /* Default exit status is 0 */
                         if(execvp(res[0],res)==-1)  /* If execution fails */
@@ -337,14 +357,15 @@ int main(int argc, char* argv[], char* envp[])
                         }
                         exit(exitStatus);   /* Return exit status */
                     }
-                    else if(foreground) /* If the process should be executed in foreground */
-                    {   
+                    else if(foreground)     /* If the process should be executed in foreground */
+                    {
+                        signal(SIGCHLD, SIG_IGN);   
                         waitpid(pid,&status,0); /* Wait for it to finish */
                     }
                 }
                 else    /* If polling should be used */
                 {
-                    signal(SIGINT,intHandler);  /* Register interrupt handler for sigchld */
+                    if(foreground)signal(SIGINT,intHandler);    /* Register interrupt handler for sigchld */
                     pid = fork();   /* Try to fork */
                     if(pid == -1)   /* If fork returns -1 it has failed */
                     {
@@ -370,9 +391,9 @@ int main(int argc, char* argv[], char* envp[])
                     gettimeofday (&tvalAfter, NULL);    /* Get the stop time */
                     printf("Time in microseconds: %ld microseconds\n",((tvalAfter.tv_sec - tvalBefore.tv_sec)*1000000L+tvalAfter.tv_usec) - tvalBefore.tv_usec);    /* Print the execution time */
                 }
-                free(res);                  /* Free the memory used */
-                foreground = 0;             /* Reset foreground variable */
-                tok = strtok(NULL, delims); /* Reset tok */
+                free(res);      /* Free the memory used */
+                foreground = 1; /* Reset foreground variable */
+                tok = NULL;     /* Reset tok */
             }
         }
     }   
