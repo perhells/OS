@@ -19,7 +19,6 @@
 /* Function that kills all process in the current processgroup */
 int exitKjell()
 {
-    signal(SIGQUIT, SIG_IGN);   /* Ignore the quit signal for the shell */
     kill(0, SIGQUIT);           /* Send the quit signal to all processes in group */
     exit(0);                    /* Exits shell */
 }
@@ -51,7 +50,7 @@ int main(int argc, char* argv[], char* envp[])
 {
     struct sigaction sa;
     FILE *fr;                                   /* Used for reading the hostname */
-    char *tok;                                   /* Holds current token when parsing a line */
+    char *tok;                                  /* Holds current token when parsing a line */
     char line[BUFFERSIZE];                      /* Line from input */
     char cwd[BUFFERSIZE];                       /* Current working directory */
     char delims[10] = " \t\n";                  /* Delimiters for tokens */
@@ -66,7 +65,7 @@ int main(int argc, char* argv[], char* envp[])
     int n_spaces = 0;                           /* Counting arguments */
     pid_t pid;                                  /* Process ID */
     struct timeval tvalBefore, tvalAfter;       /* Used to measure time of processes */
-
+    signal(SIGQUIT, SIG_IGN);                   /* Ignore the quit signal for the shell */
     sigemptyset(&sa.sa_mask);
     strcpy(username,getenv("USER"));            /* Reads environment variable USER to username */
     if(getenv("PAGER")!=NULL)                   /* If environment variable PAGER exists */
@@ -79,6 +78,7 @@ int main(int argc, char* argv[], char* envp[])
         fprintf(stderr,"fgets failed\n");
     }
     strcpy(hostname,strtok(hostname,"\n"));     /* Remove trailing newline */
+
     fclose(fr);                                 /* Close file */
     if(getcwd(cwd, sizeof(cwd))==NULL)                   /* Read current working directory */
     {
@@ -360,6 +360,7 @@ int main(int argc, char* argv[], char* envp[])
                     else if(pid == 0)       /* Execute in child process */
                     {   
                         int exitStatus = 0; /* Default exit status is 0 */
+                        signal(SIGQUIT, SIG_DFL);   /* Register the quit signal for the child process */
                         if(execvp(res[0],res)==-1)  /* If execution fails */
                         {
                             exitStatus = 1; /* Set exit status to 1 */
@@ -383,6 +384,7 @@ int main(int argc, char* argv[], char* envp[])
                     else if(pid == 0)   /* Execute in child process */
                     {   
                         int exitStatus = 0; /* Default exit status is 0 */
+                        signal(SIGQUIT, SIG_DFL);   /* Register the quit signal for the child process */
                         if(execvp(res[0],res)==-1)  /* If execution fails */
                         {
                             exitStatus = 1; /* Set exit status to 1 */
