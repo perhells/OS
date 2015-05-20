@@ -365,6 +365,7 @@ int main(int argc, char* argv[], char* envp[])
                         signal(SIGQUIT, SIG_DFL);   /* Register the quit signal for the child process */
                         if(execvp(res[0],res)==-1)  /* If execution fails */
                         {
+                            perror("Execution failed");
                             exitStatus = 1; /* Set exit status to 1 */
                         }
                         exit(exitStatus);   /* Return exit status */
@@ -389,6 +390,7 @@ int main(int argc, char* argv[], char* envp[])
                         signal(SIGQUIT, SIG_DFL);   /* Register the quit signal for the child process */
                         if(execvp(res[0],res)==-1)  /* If execution fails */
                         {
+                            perror("Execution failed");
                             exitStatus = 1; /* Set exit status to 1 */
                         }
                         exit(exitStatus);   /* Return exit status */
