@@ -12,10 +12,17 @@
 #define BUFFERSIZE 80
 #define READ 0
 #define WRITE 1
+#define KNRM  "\x1B[0m"
 #define KRED  "\x1B[31m"
-#define RESET "\033[0m"
+#define KGRN  "\x1B[32m"
+#define KYEL  "\x1B[33m"
+#define KBLU  "\x1B[34m"
+#define KMAG  "\x1B[35m"
+#define KCYN  "\x1B[36m"
+#define KWHT  "\x1B[37m"
+#define RESET  "\x1B[0m"
 #ifndef SIGDET
-#define SIGDET 1
+#define SIGDET 0
 #endif
 
 /* Function that kills all process in the current processgroup */
@@ -56,7 +63,7 @@ int main(int argc, char* argv[], char* envp[])
     char line[BUFFERSIZE];                      /* Line from input */
     char cwd[BUFFERSIZE];                       /* Current working directory */
     char delims[10] = " \t\n";                  /* Delimiters for tokens */
-    char prompt[10] = "> ";                     /* Prompt after user/host/cwd info */
+    char prompt[10] = "❯ ";                     /* Prompt after user/host/cwd info */
     char pager[BUFFERSIZE] = "less";            /* Which pager to use, less is default */
     char hostname[BUFFERSIZE];                  /* Machines hostname */
     char username[BUFFERSIZE];                  /* Username */
@@ -102,7 +109,7 @@ int main(int argc, char* argv[], char* envp[])
                 pid = waitpid(-1, &status, WNOHANG);                    /* Check if there is another procees which has terminated */
             }
         }
-        printf("[%s@%s %s] %s", username, hostname, cwd, prompt);   /* Print full prompt */
+        printf(KCYN "%s" KBLU "@" KCYN "%s" KRED " %s" KBLU " %s" RESET,username, hostname, cwd, prompt);   /* Print full prompt */
         if(fgets(line, sizeof(line), stdin)==NULL);   /* Read input */
         tok = strtok(line, delims);         /* Get first token */
         while(tok != NULL)                  /* If there is a token */
