@@ -12,6 +12,8 @@
 #define BUFFERSIZE 80
 #define READ 0
 #define WRITE 1
+#define KRED  "\x1B[31m"
+#define RESET "\033[0m"
 #ifndef SIGDET
 #define SIGDET 1
 #endif
@@ -29,7 +31,7 @@ void sandler(int signum)
     int pid = waitpid(-1,NULL,WNOHANG); /* Returns the process id of a background process if it has terminated, else 0 or -1 */
     if(pid > 0) /* Checks if a process has terminated */
     {
-        fprintf(stderr,"Process with pid %d has terminated\n",pid); /* Prints a message */
+        fprintf(stderr,KRED "Process with pid %d has terminated\n" RESET,pid); /* Prints a message */
     }
 }
 
