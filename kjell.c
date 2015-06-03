@@ -52,6 +52,7 @@ void intHandler(int signum)
 void intKjell(int signum)
 {
     fseek(stdin,0,SEEK_END);
+    fprintf(stdout,"\n");
 }
 
 /* Main function */
@@ -65,8 +66,8 @@ int main(int argc, char* argv[], char* envp[])
     char delims[10] = " \t\n";                  /* Delimiters for tokens */
     char prompt[10] = "❯ ";                     /* Prompt after user/host/cwd info */
     char pager[BUFFERSIZE] = "less";            /* Which pager to use, less is default */
-    char hostname[BUFFERSIZE];                  /* Machines hostname */
-    char username[BUFFERSIZE];                  /* Username */
+    char hostname[BUFFERSIZE] = "host";                  /* Machines hostname */
+    char username[BUFFERSIZE] = "user";                  /* Username */
     int status, pipa1[2], pipa2[2], pipa3[2];   /* Status for wait, all three pipes used in checkEnv */
     int foreground;                             /* Keeps track of whether a process should be executed in foreground */
     char ** res;                                /* Argument list */
@@ -82,13 +83,16 @@ int main(int argc, char* argv[], char* envp[])
         strcpy(pager,getenv("PAGER"));          /* Overwrite less with current PAGER */
     }
     fr = fopen ("/etc/hostname", "rt");         /* Open file that contains hostname */
-    if(fgets(hostname, BUFFERSIZE, fr)==NULL)   /* Reads hostname */
+    if(fr == NULL || fgets(hostname, BUFFERSIZE, fr)==NULL)   /* Reads hostname */
     {
         fprintf(stderr,"fgets failed\n");
     }
-    strcpy(hostname,strtok(hostname,"\n"));     /* Remove trailing newline */
+    else
+    {
+        strcpy(hostname,strtok(hostname,"\n"));     /* Remove trailing newline */
+        fclose(fr);                                 /* Close file */
+    }
 
-    fclose(fr);                                 /* Close file */
     if(getcwd(cwd, sizeof(cwd))==NULL)                   /* Read current working directory */
     {
         fprintf(stderr,"getcwd failed\n");
